@@ -334,22 +334,43 @@ module Technoweenie # :nodoc:
       #   @attachment = Attachment.create! params[:attachment]
       #
       # TODO: Allow it to work with Merb tempfiles too.
+
+      # def uploaded_data=(file_data)
+      #   if file_data.respond_to?(:content_type)
+      #     return nil if file_data.size == 0
+      #     self.content_type = file_data.content_type
+      #     self.filename     = file_data.original_filename if respond_to?(:filename)
+      #   else
+      #     return nil if file_data.blank? || file_data['size'] == 0
+      #     self.content_type = file_data['content_type']
+      #     self.filename =  file_data['filename']
+      #     file_data = file_data['tempfile']
+      #   end
+      #   if file_data.is_a?(StringIO)
+      #     file_data.rewind
+      #     set_temp_data file_data.read
+      #   else
+      #     self.temp_paths.unshift file_data
+      #   end
+      # end
+
       def uploaded_data=(file_data)
-        if file_data.respond_to?(:content_type)
-          return nil if file_data.size == 0
-          self.content_type = file_data.content_type
-          self.filename     = file_data.original_filename if respond_to?(:filename)
-        else
-          return nil if file_data.blank? || file_data['size'] == 0
-          self.content_type = file_data['content_type']
-          self.filename =  file_data['filename']
-          file_data = file_data['tempfile']
-        end
+        return nil if file_data.nil? || file_data.size == 0
+        self.content_type = detect_mimetype(file_data)
+        self.filename     = file_data.original_filename if respond_to?(:filename)
         if file_data.is_a?(StringIO)
           file_data.rewind
-          set_temp_data file_data.read
+          self.temp_data = file_data.read
         else
-          self.temp_paths.unshift file_data
+          self.temp_path = file_data.path
+        end
+      end
+
+      def detect_mimetype(file_data)
+        if file_data.content_type.strip == "application/octet-stream"
+          return File.mime_type?(file_data.original_filename)
+        else
+          return file_data.content_type
         end
       end
 
@@ -366,6 +387,11 @@ module Technoweenie # :nodoc:
       def temp_paths
         @temp_paths ||= (new_record? || !respond_to?(:full_filename) || !File.exist?(full_filename) ?
           [] : [copy_to_temp_file(full_filename)])
+      end
+
+      def temp_path=(value)
+        temp_paths.unshift value
+        temp_path
       end
 
       # Gets the data from the latest temp file.  This will read the file into memory.
@@ -407,6 +433,7 @@ module Technoweenie # :nodoc:
           "#{rand Time.now.to_i}#{filename || 'attachment'}"
         end
 
+        # Downcase and remove extra underscores from uploaded images
         def sanitize_filename(filename)
           return unless filename
           returning filename.strip do |name|
@@ -416,6 +443,12 @@ module Technoweenie # :nodoc:
 
             # Finally, replace all non alphanumeric, underscore or periods with underscore
             name.gsub! /[^A-Za-z0-9\.\-]/, '_'
+
+            # Remove multiple underscores
+            name.gsub!(/\_+/, '_')
+
+            # Downcase result including extension
+            name.downcase!
           end
         end
 

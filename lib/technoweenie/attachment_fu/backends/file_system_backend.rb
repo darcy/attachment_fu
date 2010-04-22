@@ -18,9 +18,20 @@ module Technoweenie # :nodoc:
         #
         # Overwrite this method in your model to customize the filename.
         # The optional thumbnail argument will output the thumbnail's filename.
+        # def full_filename(thumbnail = nil)
+        #   file_system_path = (thumbnail ? thumbnail_class : self).attachment_options[:path_prefix].to_s
+        #   File.join(RAILS_ROOT, file_system_path, *partitioned_path(thumbnail_name_for(thumbnail)))
+        # end
+
+        # Force tests to use a temporary directory instead of the project's public directory
         def full_filename(thumbnail = nil)
           file_system_path = (thumbnail ? thumbnail_class : self).attachment_options[:path_prefix].to_s
-          File.join(RAILS_ROOT, file_system_path, *partitioned_path(thumbnail_name_for(thumbnail)))
+          File.join(env_dir, file_system_path, *partitioned_path(thumbnail_name_for(thumbnail)))
+        end
+
+        # Use this to override the default directory when in test mode
+        def env_dir
+          RAILS_ENV == "test" ? Dir::tmpdir() : RAILS_ROOT
         end
       
         # Used as the base path that #public_filename strips off full_filename to create the public path
